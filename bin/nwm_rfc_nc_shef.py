@@ -149,18 +149,16 @@ def map_ids(config):
     nwmLookup["nwslid2nwm"] = {}
     nwmLookup = load_config_states('mapping')
 
-    for site in config['sites']:
-        site = site.upper();
-        print("Working on "+site)
-        rating_json = {}
-        
+    logging.info('Checking mapping file')
+
+    for site in config['sites']:        
         if site not in nwmLookup["nwslid2nwm"]:
-            requestURL = config["NWPSapi"]+'gauges/'+site
+            request_params = {'gauges' : site}
+            nwps_gage_url = config["NWPSapi"] + urllib.parse.urlencode(request_params)
             try:
-                response = urlopen(requestURL)
+                response = requests(nwps_gage_url, headers=config['user_agent'])
             except IOError:
-                #print(response)
-                print("  Failed to get metadata for "+site.upper()+" at:"+requestURL)
+                logging.info("Failed to get metadata for " + site.upper() + " at: "+ nwps_gage_url)
                 continue					
         
             data_json = json.loads(response.read())	
@@ -181,7 +179,7 @@ def main():
     config_vals = load_config_states('config')
 
     pdb.set_trace()
-    mapped_ids = map_ids(config_vals) 
+    mapped_ids = map_ids(config_vals)
 
 
 
