@@ -47,7 +47,7 @@ nwm_post = '.channel_rt.nc'
 # ===== initial set up for requests and logging
 logging.basicConfig(format='%(asctime)s %(levelname)-4s %(message)s',
                     handlers=[logging.FileHandler(os.path.join(log_dir, log_fn), mode='w'),
-                              logging.StreamHandler()]
+                              logging.StreamHandler()],
                     #filename=os.path.join(log_dir, log_fn),
                     #filemode='w',
                     #level=logging.DEBUG,
@@ -129,6 +129,8 @@ def load_config_states(file_type):
     elif file_type == 'mapping':
         fn = mapping_fn
     
+    logging.info('loading attempt for ' + file_type + ' file ' + fn)
+    
     with open(os.path.join(meta_dir, config_fn)) as stream:
         try:
             yaml_stream = yaml.safe_load(stream)
@@ -177,9 +179,11 @@ def main():
     utc_now = pd.Timestamp.utcnow().tz_localize(None) # using pandas for some additional functionality; localize to none for indexing purposes
 
     config_vals = load_config_states('config')
-    mapped_ids = map_ids(config_vals) 
 
     pdb.set_trace()
+    mapped_ids = map_ids(config_vals) 
+
+
 
 
 
