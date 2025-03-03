@@ -10,7 +10,7 @@
 
 
 
-import os, json, argparse, pathlib, urllib, netCDF4, requests, yaml, logging, sys, pdb
+import pdb, os, json, argparse, pathlib, urllib, netCDF4, requests, yaml, logging, sys, time
 import xarray as xr
 import pandas as pd
 import numpy as np
@@ -32,9 +32,9 @@ else:
     out_dir = pathlib.Path("/data/Incoming/")
     log_dir = pathlib.Path("/data/ldad/logs/")
 
-config_fn = 'NwmToShef.config'
-state_fn = 'NwmToShef.state'
-mapping_fn = 'NWSlid2NWM.mapping'
+config_fn = 'config.yaml'
+state_fn = 'nwm_status.yaml'
+mapping_fn = 'lid_nwm_mapping.yaml'
 log_fn = 'nwm_download.log'
 
 # ===== url info
@@ -131,7 +131,7 @@ def load_config_states(file_type):
     
     logging.info('loading attempt for ' + file_type + ' file ' + fn)
     
-    with open(os.path.join(meta_dir, config_fn)) as stream:
+    with open(os.path.join(meta_dir, fn)) as stream:
         try:
             yaml_stream = yaml.safe_load(stream)
         except IOError:
@@ -143,43 +143,52 @@ def load_config_states(file_type):
 
     return(yaml_stream)
 
-def map_ids(config):
+def map_ids(config, request_header):
 
-    nwmLookup = {}
-    nwmLookup["nwslid2nwm"] = {}
-    nwmLookup = load_config_states('mapping')
+    if os.path.exists(os.path.join(meta_dir, mapping_fn)):
+        nwm_map = load_config_states('mapping')
+    else:
+        nwm_map = {}
+        nwm_map["nwslid2nwm"] = {}
 
     logging.info('Checking mapping file')
 
     for site in config['sites']:        
-        if site not in nwmLookup["nwslid2nwm"]:
-            request_params = {'gauges' : site}
-            nwps_gage_url = config["NWPSapi"] + urllib.parse.urlencode(request_params)
+        if site.upper() not in nwm_map["nwslid2nwm"]:
+            nwps_gage_url = config["NWPSapi"] + 'gauges/' + site
             try:
-                response = requests(nwps_gage_url, headers=config['user_agent'])
+                response = requests.get(nwps_gage_url, headers=request_header)
             except IOError:
                 logging.info("Failed to get metadata for " + site.upper() + " at: "+ nwps_gage_url)
-                continue					
-        
-            data_json = json.loads(response.read())	
-            nwmReachId = data_json["reachId"]
-            print("   New NWM reachId:"+nwmReachId)
-            nwmLookup["nwslid2nwm"][site.upper()] = nwmReachId
+                continue
+            
+            nwm_reach = response.json()["reachId"]
+            logging.info("New NWM reachId for site: " + nwm_reach)
+            nwm_map["nwslid2nwm"][site.upper()] = nwm_reach
         else:
-            nwmReachId = nwmLookup["nwslid2nwm"][site.upper()]    
-            print("   Cached NWM reachId:"+nwmReachId)
+            nwm_reach = nwm_map["nwslid2nwm"][site.upper()]    
+            print("Cached NWM reachId:" + nwm_reach)
+    
+    # sorting
+    final_map = dict(sorted(nwm_map['nwslid2nwm'].items()))
+
+    with open(os.path.join(meta_dir, mapping_fn), 'w+') as yaml_file:
+        yaml_file.write(yaml.dump(final_map, default_flow_style=False))
+
+    return final_map
 
 
 
 def main():
     # loop through mode (combined water level and surge)
     arg_vals = parse_args()
-    utc_now = pd.Timestamp.utcnow().tz_localize(None) # using pandas for some additional functionality; localize to none for indexing purposes
+    utc_now = pd.Timestamp.utcnow().tz_localize(None) 
+    request_header = {'User-Agent' : config['user_agent']}
 
     config_vals = load_config_states('config')
-
+    mapped_ids = map_ids(config_vals, request_header)
     pdb.set_trace()
-    mapped_ids = map_ids(config_vals)
+    
 
 
 
