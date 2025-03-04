@@ -1,7 +1,5 @@
 # ignoring various files and directories
-etc/*
 data/*
-logs/*
 
 # vscode settings
 .vscode/

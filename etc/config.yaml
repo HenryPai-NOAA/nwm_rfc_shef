@@ -1,0 +1,222 @@
+# This is the config file for NwmToShef.py
+# YAML Format
+
+user_agent : 'NOAA NWS NWRFC'
+nomads_url : 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/'
+NWPSapi:          "https://api.water.noaa.gov/nwps/v1/"
+forceShefEncode:  no                         # (yes/no) yes - always encode; no - only encode if newer then last forecast issuance time
+outputLocation:   ./data/                    # path for shef file output - directory must exist
+#outputFileName:   output_<TIMESTAMP>.txt    # need to add  timestamp options.  On the ldad:  /data/Incoming
+outputFileName:   output.txt                 # need to add  timestamp options.  On the ldad:  /data/Incoming
+ratingCurveAge: 1                            # Days to cache the rating curve before pulling a new one, -1 to always pull
+extrapolation: false
+
+#####Output file header lines####
+outputFileHeaderLines:
+  #line1: "SRAK58 PACR @@@@@@"                                         #  @@@@@@ replaced with DDHHMM  (product timestamp)
+  #line2: "RR3ACR"
+  #Line3:                                                              #blank line
+  line4: ": Custom Lines to be placed at the top of the shef file"  
+  line5: ": Data retrieved from NWM data services : <TIMESTAMP>"       #  <TIMESTAMP> gets replaced with a current date/time
+  line6:
+  
+####List of NWM forecasts to request and default PEDTS code for shef data####
+NWMrequests:
+#  analysisAssimilation: 
+#     flow  : "QRIFU"
+#     stage : "HGIFU"
+  shortRange: 
+     flow   : "QRIFV"
+#     stage  : "HGIFV"
+#  mediumRange: 
+#    flow   :  "QRIFWZM"
+#    stage  :  "HGIFWZM"
+#  longRange: 
+#    flow   :  "QRIFXZM"
+#    stage  :  "HGIFXZM"
+  mediumRangeBlend: 
+    flow   :  "QRIFXZM"
+#    stage  :  "HGIFXZM"
+    
+#####List of NWS sites to ingest with Default PEDTS Code####
+sites : [
+  wsri1,
+  alrw1,
+  aplo3,
+  arai1,
+  ardw1,
+  arki1,
+  atgw1,
+  beao3,
+  bero3,
+  bfkw4,
+  bmtw1,
+  bonm8,
+  bono3,
+  brfi1,
+  brni1,
+  btsi1,
+  cabi1,
+  calw1,
+  cami1,
+  cfmm8,
+  chto3,
+  ciyw1,
+  cldi1,
+  clfw1,
+  cokw1,
+  coto3,
+  crnz1,
+  cshw1,
+  ctho3,
+  darm8,
+  dedi1,
+  deeo3,
+  dggi1,
+  dlgm8,
+  dono3,
+  drmm8,
+  drsw1,
+  dsrw1,
+  dwri1,
+  easi1,
+  ebsw1,
+  ecdo3,
+  egco3,
+  elko3,
+  elww1,
+  envi1,
+  falo3,
+  fcfm8,
+  ffxw1,
+  fism8,
+  flgw4,
+  fsso3,
+  garw1,
+  gibo3,
+  gorw1,
+  grew4,
+  grrw1,
+  hcro3,
+  hhwm8,
+  imno3,
+  ipdi1,
+  issw1,
+  jhno3,
+  kbdm8,
+  kerm8,
+  krbo3,
+  lauw1,
+  leri1,
+  lndw1,
+  loci1,
+  lopo3,
+  loso3,
+  lsdw1,
+  lsto3,
+  lydm8,
+  mado3,
+  mfdo3,
+  mfnw1,
+  midi1,
+  mlbo3,
+  mlkw1,
+  mnsw1,
+  mono3,
+  mori1,
+  morw1,
+  mplo3,
+  myko3,
+  myno3,
+  nasw1,
+  nffq2,
+  nfnw1,
+  nisw1,
+  nitw1,
+  nspw1,
+  nssw1,
+  ocho3,
+  oknw1,
+  orfi1,
+  ortw1,
+  paci1,
+  pacw1,
+  pacw4,
+  phio3,
+  pilw1,
+  pldi1,
+  ploi1,
+  powo3,
+  prci1,
+  prcm8,
+  prii1,
+  prli1,
+  pulw1,
+  rccm8,
+  rigi1,
+  rodw1,
+  salw4,
+  sati1,
+  satw1,
+  scoo3,
+  scro3,
+  seli1,
+  sfcm8,
+  sfln2,
+  shaw1,
+  silo3,
+  skow1,
+  slkw1,
+  sltw1,
+  smni1,
+  smrw1,
+  snqw1,
+  spew1,
+  spro3,
+  srlm8,
+  srmo3,
+  srmw1,
+  ssuw1,
+  sthw1,
+  stii1,
+  strm8,
+  suvo3,
+  swrm8,
+  tanw1,
+  tchw1,
+  tdao3,
+  thnw1,
+  thrm8,
+  tido3,
+  tilo3,
+  tilw1,
+  tlmo3,
+  tlrw1,
+  tlyo3,
+  tnaw1,
+  tolw1,
+  topi1,
+  trao3,
+  trso3,
+  trym8,
+  ubdw1,
+  undw1,
+  veno3,
+  wchw1,
+  wdhn2,
+  wfbm8,
+  wgcm8,
+  whrm8,
+  wilw1,
+  wydw1
+]
+
+
+#####List of NWS sites to ingest with Custom PEDTS Codes####
+
+customSites : [WLUH1]
+
+
+
+
+  
