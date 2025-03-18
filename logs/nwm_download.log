@@ -1,3 +1,4 @@
-2025-03-02 18:05:24 INFO loading attempt for config file config.yaml
-2025-03-02 18:05:24 INFO loading attempt for mapping file lid_nwm_mapping.yaml
-2025-03-02 18:05:24 INFO Checking mapping file
+2025-03-17 20:18:25 INFO loading attempt for config file config.yaml
+2025-03-17 20:18:25 INFO loading attempt for mapping file lid_nwm_mapping.yaml
+2025-03-17 20:18:25 INFO Checking mapping file
+2025-03-17 20:18:27 INFO nwm medium_range_blend model for 2025-03-17 12Z succesfully downloaded.  URL: https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025031712z.medium_range_blend.channel_rt.nwrfc.nc

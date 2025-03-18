@@ -19,6 +19,7 @@ os.umask(0o002)
 
 # === global var (not path related)
 # NWRFC settings
+out_fmt = 'csv'
 
 # ==== directories & filenames (site specific)
 if os.name == 'nt':
@@ -38,7 +39,7 @@ mapping_fn = 'lid_nwm_mapping.yaml'
 log_fn = 'nwm_download.log'
 
 # ===== url info
-nwm_base_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/'
+#nwm_base_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/'
 nwm_pre = 'nwm.t'
 nwm_post = '.channel_rt.nc'
 
@@ -69,55 +70,6 @@ def parse_args():
 
     return parser.parse_args()
 
-def get_url_response(model_time, current_model_bool, param, param_str):
-    """
-    generates url and does some url checking
-    returns response
-    """
-    model_day_str = model_time.strftime('%Y%m%d')
-    model_hr_str = model_time.strftime('%H')
-    model_dt_str = model_time.strftime('%Y-%m-%d %HZ')
-    full_url = nwm_base_url + nwm_pre + model_day_str + "/" + stofs_mod_pre + "t" + model_hr_str + stofs_fn_points + param + ".nc"
-
-    http = urllib3.PoolManager(cert_reqs='CERT_NONE')
-    #response = http.request('GET', full_url, headers=requests_header)
-    response = requests.get(full_url, headers=requests_header)
-
-    #pdb.set_trace()
-
-    if response.status_code == 404 and current_model_bool == True:
-        logging.info('NOS STOFS ' + param_str + ' model for ' + model_dt_str + ' not avilable (404 error).  URL: ' + full_url)
-    elif response.status_code == 404 and current_model_bool == False:
-        logging.info('NOS STOFS ' + param_str + ' model for prior timestep at ' + model_dt_str + ' not avilable (404 error).  URL: ' + full_url)
-    else:
-        logging.info('NOS STOFS ' + param_str + ' model for ' + model_dt_str + ' succesfully downloaded, url: ' + full_url)
-
-    return response, full_url, model_time
-
-def get_mod_df(now_utc, param, param_str):
-    """
-    will get most recent model run, or if most recent, get the one prior to that
-    returns netcdf df and downloaded valid run time
-    """
-    # Posted model run is 6 hrs prior to cardinal time 6-hr time.  Posting time is a few minutes prior to 6-hr cardinal time.
-    # for example, model run at 12z is posted at 17:53z.  Assumes cron runs script after 6-hr cardinal time
-    model_time = now_utc.floor('6h') - pd.Timedelta(hours=6) 
-    
-    response, full_url, model_dt = get_url_response(model_time, True, param, param_str)
-    
-    # if file download exists, convert netcdf to dataframe
-    # https://github.com/pydata/xarray/issues/1075
-    temp_fn = fname = os.path.splitext(os.path.basename(full_url))[0] + '.nc'
-    temp_fullfn = out_dir + temp_fn
-    
-    nc4_ds = netCDF4.Dataset(temp_fullfn, memory=response.content)
-    store = xr.backends.NetCDF4DataStore(nc4_ds)
-
-    xa = xr.open_dataset(store)
-    nc_df = xa.to_dataframe()
-
-    return nc_df, model_dt
-
 def load_config_states(file_type):
     '''
     loads and returns yaml config/states files
@@ -147,11 +99,10 @@ def map_ids(config, request_header):
 
     if os.path.exists(os.path.join(meta_dir, mapping_fn)):
         nwm_map = load_config_states('mapping')
+        logging.info('Checking mapping file')
     else:
         nwm_map = {}
         nwm_map["nwslid2nwm"] = {}
-
-    logging.info('Checking mapping file')
 
     for site in config['sites']:        
         if site.upper() not in nwm_map["nwslid2nwm"]:
@@ -163,19 +114,120 @@ def map_ids(config, request_header):
                 continue
             
             nwm_reach = response.json()["reachId"]
-            logging.info("New NWM reachId for site: " + nwm_reach)
-            nwm_map["nwslid2nwm"][site.upper()] = nwm_reach
+            if nwm_reach == '':
+                logging.info("Valid lid for " + site + ", but empty NWM reachId.  Will not map.")
+            else:
+                logging.info("New NWM reachId for " + site + " : "+ nwm_reach)
+                nwm_reach = int(nwm_reach)
+                nwm_map["nwslid2nwm"][site.upper()] = nwm_reach
+            
         else:
             nwm_reach = nwm_map["nwslid2nwm"][site.upper()]    
-            print("Cached NWM reachId:" + nwm_reach)
-    
+            print("Cached NWM reachId " + site + " : " + str(nwm_reach))
+        
     # sorting
-    final_map = dict(sorted(nwm_map['nwslid2nwm'].items()))
+    nwm_map['nwslid2nwm'] = dict(sorted(nwm_map['nwslid2nwm'].items()))
 
     with open(os.path.join(meta_dir, mapping_fn), 'w+') as yaml_file:
-        yaml_file.write(yaml.dump(final_map, default_flow_style=False))
+        yaml_file.write(yaml.dump(nwm_map, default_flow_style=False))
 
-    return final_map
+    map_df = pd.json_normalize(nwm_map['nwslid2nwm']).T.reset_index().set_axis(['lid','station_id'], axis=1)
+
+    return map_df
+
+def get_url_response(model_time, mod_type, request_header, config_vals):
+    """
+    generates url and does some url checking
+    returns response
+    """
+    model_dt_str = model_time.strftime('%Y-%m-%d %HZ')
+    url_dt_str = model_time.strftime('%Y%m%d%Hz')
+
+    rfc_str = config_vals['rfc_id'].lower() + 'rfc'
+    nwm_var_mod_type = [key for key, value in config_vals['nwm_var_meta'].items() if mod_type in key][0]
+
+    full_url = (config_vals['nomads_rfc_url'] + config_vals['rfc_id'] + '/' + config_vals['nwm_type'] + '/' +           # path
+                nwm_pre + url_dt_str + '.' + nwm_var_mod_type + '.' + config_vals['nwm_type'] + '.' + rfc_str + '.nc')  # filename
+
+    response = requests.get(full_url, headers=request_header)
+
+    if response.status_code == 404:
+        logging.info('nwm ' + nwm_var_mod_type + ' model for ' + model_dt_str + ' not avilable (404 error).  URL: ' + full_url)
+    else:
+        logging.info('nwm ' + nwm_var_mod_type + ' model for ' + model_dt_str + ' succesfully downloaded.  URL: ' + full_url)
+
+    return response, full_url, nwm_var_mod_type
+
+def get_mod_df(now_utc, mod_type, request_header, config_vals):
+    """
+    will get most recent model run
+    """
+    # Posted model run is 6 hrs prior to cardinal time 6-hr time.  Posting time is a few minutes prior to 6-hr cardinal time.
+    # for example, model run at 12z is posted at 17:53z.  Assumes cron runs script after 6-hr cardinal time (so about 2 time steps).
+    # Similar is the case for short range
+    if mod_type == 'medium': # only evaluating medium range blend
+        model_time = now_utc.floor('6h') - pd.Timedelta(hours=12)
+    elif mod_type == 'short':
+        model_time = now_utc.floor('1h') - pd.Timedelta(hours=1)
+    
+    response, full_url, nwm_var_mod_type = get_url_response(model_time, mod_type, request_header, config_vals)
+    
+    # if file download exists, convert netcdf to dataframe
+    # https://github.com/pydata/xarray/issues/1075
+    temp_fn = os.path.splitext(os.path.basename(full_url))[0] + '.nc'
+    temp_fullfn = os.path.join(out_dir, temp_fn)
+    
+    nc4_ds = netCDF4.Dataset(temp_fullfn, memory=response.content)
+    store = xr.backends.NetCDF4DataStore(nc4_ds)
+
+    xa = xr.open_dataset(store)
+    nc_df = xa.to_dataframe()
+
+    return nc_df, model_time, nwm_var_mod_type
+
+def make_csv(df, config_vals, mod_dt, nwm_var_mod_type):
+    '''
+    csv cols:   lid,
+                pe,
+                dur (0),
+                ts,
+                extremum (Z),
+                probability (-1 short/50 medium),
+                validtime, 
+                basistime, 
+                value, 
+                shef_qual_code (Z), 
+                quality_code (1879048191, optional?),
+                revision (0/1), 
+                product_id
+    '''
+    pedtsep = config_vals['nwm_var_meta'][nwm_var_mod_type][config_vals['nwm_var']]
+
+    if pedtsep[2] == 'I':
+        dur = 0
+
+    try:
+        if pedtsep[6] == 'M':
+            prob = -0.05   # shef manual, pg H-2 
+    except:
+        prob = -1.0
+
+    return_df = pd.DataFrame()
+    return_df['lid'] = df['lid']
+    return_df['pe'] = pedtsep[0:2]
+    return_df['dur'] = dur
+    return_df['ts'] = pedtsep[3:5]
+    return_df['extremum'] = pedtsep[5]
+    return_df['probability'] = prob
+    return_df['valid_time'] = df['time']
+    return_df['basis_time'] = mod_dt
+    return_df['value'] = df[config_vals['nwm_var']]
+    return_df['shef_qual_code'] = 'Z'
+    return_df['quality_code'] = 1879048191
+    return_df['revision'] = 0
+    return_df['product_id'] = config_vals['outputFileHeaderLines']['line2']
+
+    return return_df
 
 
 
@@ -183,10 +235,21 @@ def main():
     # loop through mode (combined water level and surge)
     arg_vals = parse_args()
     utc_now = pd.Timestamp.utcnow().tz_localize(None) 
-    request_header = {'User-Agent' : config['user_agent']}
 
     config_vals = load_config_states('config')
-    mapped_ids = map_ids(config_vals, request_header)
+    request_header = {'User-Agent' : config_vals['user_agent_pre'] + ' ' + config_vals['rfc_id'] + 'RFC'}
+    map_df = map_ids(config_vals, request_header)
+    mod_df, mod_dt, nwm_var_mod_type = get_mod_df(utc_now, arg_vals.mod, request_header, config_vals)
+
+    mod_select_df = mod_df.copy().reset_index()[['station_id', 'time', config_vals['nwm_var']]]
+
+    merged_df = map_df.merge(mod_select_df.copy())
+    merged_df['streamflow'] = round(merged_df['streamflow']  * pow(100, 3) / pow(2.54, 3) / pow(12, 3), 2) # units & round
+    
+    if out_fmt == 'csv':
+        csv_df = make_csv(merged_df, config_vals, mod_dt, nwm_var_mod_type)
+        producttime = pd.Timestamp.utcnow().tz_localize(None)
+
     pdb.set_trace()
     
 

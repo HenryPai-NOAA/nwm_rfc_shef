@@ -1,41 +1,44 @@
 # This is the config file for NwmToShef.py
 # YAML Format
 
-user_agent : 'NOAA NWS NWRFC'
-nomads_url : 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/'
+user_agent_pre : 'NOAA NWS'
+rfc_id : 'NW'
+nomads_rfc_url : 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/'
+nwm_type : 'channel_rt' # domain type: channel_rt, fe (forcings engine), land, shapefile
+nwm_var : 'streamflow'
 NWPSapi:          "https://api.water.noaa.gov/nwps/v1/"
 forceShefEncode:  no                         # (yes/no) yes - always encode; no - only encode if newer then last forecast issuance time
 outputLocation:   ./data/                    # path for shef file output - directory must exist
 #outputFileName:   output_<TIMESTAMP>.txt    # need to add  timestamp options.  On the ldad:  /data/Incoming
-outputFileName:   output.txt                 # need to add  timestamp options.  On the ldad:  /data/Incoming
+outputFileName:   nwm_pts_                   # need to add  timestamp options.  On the ldad:  /data/Incoming
 ratingCurveAge: 1                            # Days to cache the rating curve before pulling a new one, -1 to always pull
 extrapolation: false
 
 #####Output file header lines####
 outputFileHeaderLines:
-  #line1: "SRAK58 PACR @@@@@@"                                         #  @@@@@@ replaced with DDHHMM  (product timestamp)
-  #line2: "RR3ACR"
+  line1: "TTAA00 KPTR @@@@@@"                                         #  @@@@@@ replaced with DDHHMM  (product timestamp)
+  line2: "NWM_webNc"
   #Line3:                                                              #blank line
   line4: ": Custom Lines to be placed at the top of the shef file"  
   line5: ": Data retrieved from NWM data services : <TIMESTAMP>"       #  <TIMESTAMP> gets replaced with a current date/time
   line6:
   
 ####List of NWM forecasts to request and default PEDTS code for shef data####
-NWMrequests:
+nwm_var_meta:
 #  analysisAssimilation: 
 #     flow  : "QRIFU"
 #     stage : "HGIFU"
-  shortRange: 
-     flow   : "QRIFV"
-#     stage  : "HGIFV"
+  short_range: 
+     streamflow   : "QRIFM"  # for total water level, this as FM
+#     stage  : "HGIFM"
 #  mediumRange: 
-#    flow   :  "QRIFWZM"
-#    stage  :  "HGIFWZM"
+#    flow   :  "QRIFRZM"  # for total water level, this is FR
+#    stage  :  "HGIFRZM"
 #  longRange: 
 #    flow   :  "QRIFXZM"
 #    stage  :  "HGIFXZM"
-  mediumRangeBlend: 
-    flow   :  "QRIFXZM"
+  medium_range_blend: 
+    streamflow   :  "QRIFXZM"
 #    stage  :  "HGIFXZM"
     
 #####List of NWS sites to ingest with Default PEDTS Code####
@@ -50,7 +53,7 @@ sites : [
   beao3,
   bero3,
   bfkw4,
-  bmtw1,
+  #bmtw1,
   bonm8,
   bono3,
   brfi1,
@@ -80,7 +83,7 @@ sites : [
   dsrw1,
   dwri1,
   easi1,
-  ebsw1,
+  #ebsw1,
   ecdo3,
   egco3,
   elko3,
@@ -129,7 +132,7 @@ sites : [
   myko3,
   myno3,
   nasw1,
-  nffq2,
+  #nffq2,
   nfnw1,
   nisw1,
   nitw1,
