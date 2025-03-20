@@ -1,25 +1,38 @@
 #!/awips2/python/bin/python
 
-# poc:          henry pai
-# last edit:    feb 2025 
-# last edit:    hp, feb 2025
-# edit notes:   usbr scraper rewrite
+# author:       henry pai
+# last edit:    hp, mar 2025
+# edit notes:   nwm netcdf to shef/csv scraper to be ingested db
 
+# description:  nwm netcdf to shef/csv scraper to be ingested db.  Uses RFC endpoints as faster method for download and mapping
+#               which can take >20 minutes for nwps api call
 # 
-# https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/
+# most globals handled by config.yaml file. other globals in script were used for fast testing and deployment.  Cron's should be run hourly
+# calls:
+# - nwm_rfc_shef.py --mod medium  --> medium range blend (mean from nbm forcings i believe). updated 6 hours, but uploaded inconsistently to nomads 
+# - nwm_rfc_shef.py --mod short   --> short range (forced by hrrr i believe)
+# 
+# yaml files:
+# - config.yaml - edit sites as needed, initially focused on upstream locations
+# - lid_nwm_mapping.yaml - just a mapping file... could just be csv
+#
+# useful info:
+# - nomads netcdf location: https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/
+# - inspired by: https://vlab.noaa.gov/redmine/projects/nwsscp/repository/show/Ldad/NwmToShef
+# - also by J. Lohtak & T. Dixon script from nomads time-lagged ensembles: nwm_data.py
+#
+# todo:
+# - [ ] other time-lagged info, would need clarification
 
-
-
-import pdb, os, json, argparse, pathlib, urllib, netCDF4, requests, yaml, logging, sys, time
+import pdb, os, argparse, pathlib, netCDF4, requests, yaml, logging, sys
 import xarray as xr
 import pandas as pd
-import numpy as np
 
 os.umask(0o002)
 
 # === global var (not path related)
 # NWRFC settings
-out_fmt = 'csv'
+out_fmt = 'shef'
 
 # ==== directories & filenames (site specific)
 if os.name == 'nt':
@@ -43,15 +56,10 @@ log_fn = 'nwm_download.log'
 nwm_pre = 'nwm.t'
 nwm_post = '.channel_rt.nc'
 
-
-
 # ===== initial set up for requests and logging
 logging.basicConfig(format='%(asctime)s %(levelname)-4s %(message)s',
                     handlers=[logging.FileHandler(os.path.join(log_dir, log_fn), mode='w'),
                               logging.StreamHandler()],
-                    #filename=os.path.join(log_dir, log_fn),
-                    #filemode='w',
-                    #level=logging.DEBUG,
                     level=logging.INFO,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -96,6 +104,9 @@ def load_config_states(file_type):
     return(yaml_stream)
 
 def map_ids(config, request_header):
+    '''
+    from Crane & David's NwmToShef.py code 
+    '''
 
     if os.path.exists(os.path.join(meta_dir, mapping_fn)):
         nwm_map = load_config_states('mapping')
@@ -229,7 +240,61 @@ def make_csv(df, config_vals, mod_dt, nwm_var_mod_type):
 
     return return_df
 
+def write_header(header_lines,  nwm_var_mod_type, filetime, mod_dt, file_obj):
+    """
+    from Crane & David's NwmToShef.py code
+    """
+    shefData = ""
+    for line in header_lines:
+        if line:
+            shefData = shefData + header_lines[line] + "\n"
+        else:
+            shefData = shefData + "\n"
+    shefData = shefData.replace("<TIMESTAMP>", filetime.strftime("%Y-%m-%d %H:%M:%S"))
+    shefData = shefData.replace("@@@@@@", mod_dt.strftime("%d%H%M"))
+    shefData = shefData.replace('<MODTYPE>', nwm_var_mod_type)
 
+    file_obj.write(shefData)
+    file_obj.flush()
+
+def get_array_vals(data, n):
+    """
+    https://stackoverflow.com/questions/20112503/how-to-get-elements-from-a-list-by-groups-of-10-or-5-or-3-etc
+    slicing data array/list by number values (12) in a shef row
+    """
+    for i in range(0, len(data), n):
+        yield data[i:i+n]
+
+def make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type):
+    """
+    generates list of shef rows of data
+    """
+    model_date_str = mod_dt.strftime('%Y%m%d')
+    model_dt_str = mod_dt.strftime('%m%d%H%M')
+    model_time_str = mod_dt.strftime('%H%M')
+
+    pedtsep = config_vals['nwm_var_meta'][nwm_var_mod_type][config_vals['nwm_var']]
+    param_vals = site_df[config_vals['nwm_var']]
+    
+    interval_str = 'DIH1'
+    first_line_info = '.E ' + lid + ' ' + model_date_str + ' Z DH' + model_time_str + '/DC' + model_dt_str + '/' + pedtsep + '/' + interval_str + '/'
+
+    # fixed width filling in, first line only has 5 values, rest of the lines have 10, round to 0 spaces
+    # https://stackoverflow.com/questions/8450472/how-to-print-a-string-at-a-fixed-width
+    first_line_data_str = '/'.join(['{0: >9}'.format('{:.0f}'.format(param_val)) for param_val in param_vals[:5]])
+
+    return_li = []
+    return_li.append(first_line_info + first_line_data_str)
+
+    # for the rest of the data after the first 5 values
+    for i, row_vals in enumerate(get_array_vals(param_vals[5:], 12)):
+        new_row_str_id = '{0: <5}'.format('.E' + str(i + 1))
+        row_vals_str = '/'.join(['{0: >9}'.format('{:.0f}'.format(row_val, 2)) for row_val in row_vals])
+        row_str = new_row_str_id + row_vals_str
+
+        return_li.append(row_str)
+    
+    return return_li
 
 def main():
     # loop through mode (combined water level and surge)
@@ -241,27 +306,33 @@ def main():
     map_df = map_ids(config_vals, request_header)
     mod_df, mod_dt, nwm_var_mod_type = get_mod_df(utc_now, arg_vals.mod, request_header, config_vals)
 
+    nwm_var = config_vals['nwm_var']
+
     mod_select_df = mod_df.copy().reset_index()[['station_id', 'time', config_vals['nwm_var']]]
 
     merged_df = map_df.merge(mod_select_df.copy())
-    merged_df['streamflow'] = round(merged_df['streamflow']  * pow(100, 3) / pow(2.54, 3) / pow(12, 3), 2) # units & round
-    
+    merged_df[nwm_var] = round(merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3)) # units & round
+    merged_df[nwm_var] = merged_df[nwm_var].mask(merged_df[nwm_var] < 0, -9999)
+
+    filetime = pd.Timestamp.utcnow().floor('S').tz_localize(None) 
+    out_suffix = '.' + out_fmt
+    out_fn = config_vals['outputFileName'] + '.' + nwm_var_mod_type + out_suffix
+
     if out_fmt == 'csv':
         csv_df = make_csv(merged_df, config_vals, mod_dt, nwm_var_mod_type)
-        producttime = pd.Timestamp.utcnow().tz_localize(None)
+        csv_df.to_csv(os.path.join(out_dir, out_fn), index=False)
+    elif out_fmt == 'shef':
+        f = open(os.path.join(out_dir, out_fn), 'w')
 
-    pdb.set_trace()
-    
+        write_header(config_vals['outputFileHeaderLines'], nwm_var_mod_type, filetime, mod_dt, f)
 
+        for lid in merged_df['lid'].unique():
+            site_df = merged_df[merged_df['lid'] == lid]
+            site_shef_rows_li = make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type)
 
-
-
-
-
-    logging.info('NWM download to shef started at ' + utc_now.strftime('%Y-%m-%d_%H:%M:%S'))
-
-    nc_df, valid_model_dt = get_mod_df(utc_now, param, param_str)
-
+            f.write('\n'.join(site_shef_rows_li))
+            f.write('\n')
+            f.flush()
 
 if __name__ == '__main__':
     main()
