@@ -7,7 +7,8 @@
 # description:  nwm netcdf to shef/csv scraper to be ingested db.  Uses RFC endpoints as faster method for download and mapping
 #               which can take >20 minutes for nwps api call
 # 
-# most globals handled by config.yaml file. other globals in script were used for fast testing and deployment.  Cron's should be run hourly
+# most globals handled by config.yaml file. other globals in script were used for fast testing and deployment and easier eval of input/outputs (personal pref).
+# Cron's should be run hourly
 # calls:
 # - nwm_rfc_shef.py --mod medium  --> medium range blend (mean from nbm forcings i believe). updated 6 hours, but uploaded inconsistently to nomads 
 # - nwm_rfc_shef.py --mod short   --> short range (forced by hrrr i believe)
@@ -166,6 +167,7 @@ def get_url_response(model_time, mod_type, request_header, config_vals):
 
     if response.status_code == 404:
         logging.info('nwm ' + nwm_var_mod_type + ' model for ' + model_dt_str + ' not avilable (404 error).  URL: ' + full_url)
+        sys.exit()
     else:
         logging.info('nwm ' + nwm_var_mod_type + ' model for ' + model_dt_str + ' succesfully downloaded.  URL: ' + full_url)
 
