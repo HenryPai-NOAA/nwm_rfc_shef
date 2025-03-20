@@ -181,7 +181,7 @@ def get_mod_df(now_utc, mod_type, request_header, config_vals):
     # for example, model run at 12z is posted at 17:53z.  Assumes cron runs script after 6-hr cardinal time (so about 2 time steps).
     # Similar is the case for short range
     if mod_type == 'medium': # only evaluating medium range blend
-        model_time = now_utc.floor('6h') - pd.Timedelta(hours=6)
+        model_time = now_utc.floor('6h') - pd.Timedelta(hours=12)
     elif mod_type == 'short':
         model_time = now_utc.floor('1h') - pd.Timedelta(hours=1)
     
@@ -275,7 +275,7 @@ def make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type):
     """
     model_date_str = mod_dt.strftime('%Y%m%d')
     model_dt_str = mod_dt.strftime('%m%d%H%M')
-    model_time_str = mod_dt.strftime('%H%M')
+    model_time_str = (mod_dt + pd.Timedelta(hours=1)).strftime('%H%M') # time stemp is one hour after when looking at csv output
 
     pedtsep = config_vals['nwm_var_meta'][nwm_var_mod_type][config_vals['nwm_var']]
     param_vals = site_df[config_vals['nwm_var']]
@@ -285,7 +285,7 @@ def make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type):
 
     # fixed width filling in, first line only has 5 values, rest of the lines have 10, round to 0 spaces
     # https://stackoverflow.com/questions/8450472/how-to-print-a-string-at-a-fixed-width
-    first_line_data_str = '/'.join(['{0: >9}'.format('{:.0f}'.format(param_val)) for param_val in param_vals[:5]])
+    first_line_data_str = '/'.join(['{0: >9}'.format('{:.3f}'.format(param_val)) for param_val in param_vals[:5]])
 
     return_li = []
     return_li.append(first_line_info + first_line_data_str)
@@ -293,7 +293,7 @@ def make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type):
     # for the rest of the data after the first 5 values
     for i, row_vals in enumerate(get_array_vals(param_vals[5:], 12)):
         new_row_str_id = '{0: <5}'.format('.E' + str(i + 1))
-        row_vals_str = '/'.join(['{0: >9}'.format('{:.0f}'.format(row_val, 2)) for row_val in row_vals])
+        row_vals_str = '/'.join(['{0: >9}'.format('{:.3f}'.format(row_val, 2)) for row_val in row_vals])
         row_str = new_row_str_id + row_vals_str
 
         return_li.append(row_str)
@@ -315,7 +315,7 @@ def main():
     mod_select_df = mod_df.copy().reset_index()[['station_id', 'time', config_vals['nwm_var']]]
 
     merged_df = map_df.merge(mod_select_df.copy())
-    merged_df[nwm_var] = round(merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3)) # units & round
+    merged_df[nwm_var] = round((merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3))/1000, 3) # units & round
     merged_df[nwm_var] = merged_df[nwm_var].mask(merged_df[nwm_var] < 0, -9999)
 
     filetime = pd.Timestamp.utcnow().floor('S').tz_localize(None) 

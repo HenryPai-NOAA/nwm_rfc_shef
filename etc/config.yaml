@@ -7,7 +7,7 @@ nomads_rfc_url : 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-proces
 nwm_type : 'channel_rt' # domain type: channel_rt, fe (forcings engine), land, shapefile
 nwm_var : 'streamflow'
 NWPSapi:          "https://api.water.noaa.gov/nwps/v1/"
-outputFileName:   nwm_nc_pts_                # need to add  timestamp options.  On the ldad:  /data/Incoming
+outputFileName:   nwm_nc_pts # adding nwm_var_meta and .shef as suffix defined more in script area
 
 #####Output file header lines, comment out/remove empty lines####
 outputFileHeaderLines:
