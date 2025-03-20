@@ -22,7 +22,8 @@
 # - also by J. Lohtak & T. Dixon script from nomads time-lagged ensembles: nwm_data.py
 #
 # todo:
-# - [ ] other time-lagged info, would need clarification
+# [ ] other time-lagged info, would need clarification
+# [ ] implement state logfile, but db should be able to easily inform
 
 import pdb, os, argparse, pathlib, netCDF4, requests, yaml, logging, sys
 import xarray as xr
@@ -51,10 +52,11 @@ state_fn = 'nwm_status.yaml'
 mapping_fn = 'lid_nwm_mapping.yaml'
 log_fn = 'nwm_download.log'
 
-# ===== url info
-#nwm_base_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/'
 nwm_pre = 'nwm.t'
 nwm_post = '.channel_rt.nc'
+
+# ===== url info
+#nwm_base_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/'
 
 # ===== initial set up for requests and logging
 logging.basicConfig(format='%(asctime)s %(levelname)-4s %(message)s',
@@ -177,7 +179,7 @@ def get_mod_df(now_utc, mod_type, request_header, config_vals):
     # for example, model run at 12z is posted at 17:53z.  Assumes cron runs script after 6-hr cardinal time (so about 2 time steps).
     # Similar is the case for short range
     if mod_type == 'medium': # only evaluating medium range blend
-        model_time = now_utc.floor('6h') - pd.Timedelta(hours=12)
+        model_time = now_utc.floor('6h') - pd.Timedelta(hours=6)
     elif mod_type == 'short':
         model_time = now_utc.floor('1h') - pd.Timedelta(hours=1)
     
