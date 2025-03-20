@@ -24,6 +24,7 @@
 # todo:
 # [ ] other time-lagged info, would need clarification
 # [ ] implement state logfile, but db should be able to easily inform
+# [ ] better logging
 
 import pdb, os, argparse, pathlib, netCDF4, requests, yaml, logging, sys
 import xarray as xr
@@ -32,7 +33,6 @@ import pandas as pd
 os.umask(0o002)
 
 # === global var (not path related)
-# NWRFC settings
 out_fmt = 'shef'
 
 # ==== directories & filenames (site specific)
@@ -98,7 +98,7 @@ def load_config_states(file_type):
             yaml_stream = yaml.safe_load(stream)
         except IOError:
             if file_type == 'config':
-                logging.info("No config file, 'cp doc/NwmToShef.config.example etc/NwmToShef.config' and edit as required.")
+                logging.info("No config file")
                 sys.exit()
             else:
                 logging.info('NWM ' + file_type  + ' file does not exist will create a file' + fn)
@@ -335,6 +335,8 @@ def main():
             f.write('\n'.join(site_shef_rows_li))
             f.write('\n')
             f.flush()
+        
+        f.close()
 
 if __name__ == '__main__':
     main()
