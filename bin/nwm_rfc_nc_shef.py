@@ -43,7 +43,7 @@ if os.name == 'nt':
     out_dir = os.path.join(work_dir, "data")
     log_dir = os.path.join(work_dir, "logs")
 else:
-    work_dir = pathlib.Path("/data/ldad/snotel/")
+    work_dir = pathlib.Path("/data/ldad/nwm/shef/")
     meta_dir = work_dir
     out_dir = pathlib.Path("/data/Incoming/")
     log_dir = pathlib.Path("/data/ldad/logs/")
@@ -181,7 +181,7 @@ def get_mod_df(now_utc, mod_type, request_header, config_vals):
     # for example, model run at 12z is posted at 17:53z.  Assumes cron runs script after 6-hr cardinal time (so about 2 time steps).
     # Similar is the case for short range
     if mod_type == 'medium': # only evaluating medium range blend
-        model_time = now_utc.floor('6h') - pd.Timedelta(hours=12)
+        model_time = now_utc.floor('6h') - pd.Timedelta(hours=6)
     elif mod_type == 'short':
         model_time = now_utc.floor('1h') - pd.Timedelta(hours=1)
     
@@ -283,7 +283,7 @@ def make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type):
     interval_str = 'DIH1'
     first_line_info = '.E ' + lid + ' ' + model_date_str + ' Z DH' + model_time_str + '/DC' + model_dt_str + '/' + pedtsep + '/' + interval_str + '/'
 
-    # fixed width filling in, first line only has 5 values, rest of the lines have 10, round to 0 spaces
+    # fixed width filling in, first line only has 5 values, rest of the lines have 10, round to 3 spaces
     # https://stackoverflow.com/questions/8450472/how-to-print-a-string-at-a-fixed-width
     first_line_data_str = '/'.join(['{0: >9}'.format('{:.3f}'.format(param_val)) for param_val in param_vals[:5]])
 
@@ -315,17 +315,19 @@ def main():
     mod_select_df = mod_df.copy().reset_index()[['station_id', 'time', config_vals['nwm_var']]]
 
     merged_df = map_df.merge(mod_select_df.copy())
-    merged_df[nwm_var] = round((merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3))/1000, 3) # units & round
-    merged_df[nwm_var] = merged_df[nwm_var].mask(merged_df[nwm_var] < 0, -9999)
-
+    
     filetime = pd.Timestamp.utcnow().floor('S').tz_localize(None) 
     out_suffix = '.' + out_fmt
     out_fn = config_vals['outputFileName'] + '.' + nwm_var_mod_type + out_suffix
 
     if out_fmt == 'csv':
+        merged_df[nwm_var] = round((merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3))) # units & round
+        merged_df[nwm_var] = merged_df[nwm_var].mask(merged_df[nwm_var] < 0, -9999)
         csv_df = make_csv(merged_df, config_vals, mod_dt, nwm_var_mod_type)
         csv_df.to_csv(os.path.join(out_dir, out_fn), index=False)
     elif out_fmt == 'shef':
+        merged_df[nwm_var] = round((merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3))/1000, 3) # units & round
+        merged_df[nwm_var] = merged_df[nwm_var].mask(merged_df[nwm_var] < 0, -9999)
         f = open(os.path.join(out_dir, out_fn), 'w')
 
         write_header(config_vals['outputFileHeaderLines'], nwm_var_mod_type, filetime, mod_dt, f)
