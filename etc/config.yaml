@@ -19,9 +19,9 @@ outputFileHeaderLines:
 ####List of NWM forecasts to request and default PEDTS code for shef data####
 nwm_var_meta:
 #  analysis_assim: 
-#    streamflowflow  : "QRIFU"
+#    streamflowflow  : "QRIFUZ"
   short_range: 
-     streamflow   : "QRIFM"  # for total water level, this as FM
+     streamflow   : "QRIFMZ"  # for total water level, this as FM, was missing extremum
 #  medirum_range: 
 #    streamflow   :  "QRIFRZM"  # for total water level, this is FR
 #  long_range: 
@@ -31,6 +31,15 @@ nwm_var_meta:
     
 #####List of NWS sites to ingest with Default PEDTS Code####
 sites : [
+  buso3,
+  pihi1,
+  sero3,
+  glbw1,
+  ssfw1,
+  argw1,
+  arlw1,
+  nrkw1,
+  squw1,
   wsri1,
   alrw1,
   aplo3,

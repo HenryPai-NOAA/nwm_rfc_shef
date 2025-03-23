@@ -127,7 +127,7 @@ def map_ids(config, request_header):
                 logging.info("Failed to get metadata for " + site.upper() + " at: "+ nwps_gage_url)
                 continue
             
-            nwm_reach = response.json()["reachId"]
+            nwm_reach = response.json()['reachId']
             if nwm_reach == '':
                 logging.info("Valid lid for " + site + ", but empty NWM reachId.  Will not map.")
             else:
@@ -327,7 +327,7 @@ def main():
         csv_df.to_csv(os.path.join(out_dir, out_fn), index=False)
     elif out_fmt == 'shef':
         merged_df[nwm_var] = round((merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3))/1000, 3) # units & round
-        merged_df[nwm_var] = merged_df[nwm_var].mask(merged_df[nwm_var] < 0, -9999)
+        merged_df = merged_df[merged_df[nwm_var] > 0]
         f = open(os.path.join(out_dir, out_fn), 'w')
 
         write_header(config_vals['outputFileHeaderLines'], nwm_var_mod_type, filetime, mod_dt, f)
