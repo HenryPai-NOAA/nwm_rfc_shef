@@ -1,4 +1,4 @@
-2025-03-22 17:00:57 INFO loading attempt for config file config.yaml
-2025-03-22 17:00:57 INFO loading attempt for mapping file lid_nwm_mapping.yaml
-2025-03-22 17:00:57 INFO Checking mapping file
-2025-03-22 17:00:58 INFO nwm short_range model for 2025-03-22 23Z not avilable (404 error).  URL: https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025032223z.short_range.channel_rt.nwrfc.nc
+2025-03-23 14:30:29 INFO loading attempt for config file config.yaml
+2025-03-23 14:30:29 INFO loading attempt for mapping file lid_nwm_mapping.yaml
+2025-03-23 14:30:29 INFO Checking mapping file
+2025-03-23 14:30:30 INFO nwm short_range model for 2025-03-23 19Z succesfully downloaded.  URL: https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025032319z.short_range.channel_rt.nwrfc.nc

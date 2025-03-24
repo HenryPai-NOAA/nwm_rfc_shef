@@ -1,5 +1,6 @@
 # ignoring various files and directories
 data/*
+logs/nwm_download.log
 
 # vscode settings
 .vscode/
