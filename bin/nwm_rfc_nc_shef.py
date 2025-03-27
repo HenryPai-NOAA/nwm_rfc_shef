@@ -2,7 +2,7 @@
 
 # author:       henry pai
 # last edit:    hp, mar 2025
-# edit notes:   nwm netcdf to shef/csv scraper to be ingested db
+# edit notes:   added some arguments, added para dl option, and added all forecast locations to dl (commented some out)
 
 # description:  nwm netcdf to shef/csv scraper to be ingested db.  Uses RFC endpoints as faster method for download and mapping
 #               which can take >20 minutes for nwps api call
@@ -76,9 +76,22 @@ def parse_args():
     parser.add_argument(
         '--mod',
         default='medium',
+        choices=['medium', 'short'],
         help="model type (short, medium)"
         )
-
+    parser.add_argument(
+        '--version',
+        default='oper',
+        choices=['oper', 'para'],
+        help='version for oper(ational)/para(llel)'
+        )
+    parser.add_argument(
+        '--back',
+        default=1,
+        choices=['1', '2'],
+        help='model timestep lookback multiplier, limit to 1/2'
+        )
+    
     return parser.parse_args()
 
 def load_config_states(file_type):
@@ -121,23 +134,20 @@ def map_ids(config, request_header):
     for site in config['sites']:        
         if site.upper() not in nwm_map["nwslid2nwm"]:
             nwps_gage_url = config["NWPSapi"] + 'gauges/' + site
-            try:
-                response = requests.get(nwps_gage_url, headers=request_header)
-            except IOError:
+            response = requests.get(nwps_gage_url, headers=request_header)
+            if response.status_code == 404:
                 logging.info("Failed to get metadata for " + site.upper() + " at: "+ nwps_gage_url)
-                continue
-            
-            nwm_reach = response.json()['reachId']
-            if nwm_reach == '':
-                logging.info("Valid lid for " + site + ", but empty NWM reachId.  Will not map.")
             else:
-                logging.info("New NWM reachId for " + site + " : "+ nwm_reach)
-                nwm_reach = int(nwm_reach)
-                nwm_map["nwslid2nwm"][site.upper()] = nwm_reach
-            
+                nwm_reach = response.json()['reachId']
+                if nwm_reach == '':
+                    logging.info("Valid lid for " + site + ", but empty NWM reachId.  Will not map.")
+                else:
+                    logging.info("New NWM reachId for " + site + " : "+ nwm_reach)
+                    nwm_reach = int(nwm_reach)
+                    nwm_map["nwslid2nwm"][site.upper()] = nwm_reach     
         else:
             nwm_reach = nwm_map["nwslid2nwm"][site.upper()]    
-            print("Cached NWM reachId " + site + " : " + str(nwm_reach))
+            #print("Cached NWM reachId " + site + " : " + str(nwm_reach))
         
     # sorting
     nwm_map['nwslid2nwm'] = dict(sorted(nwm_map['nwslid2nwm'].items()))
@@ -149,7 +159,7 @@ def map_ids(config, request_header):
 
     return map_df
 
-def get_url_response(model_time, mod_type, request_header, config_vals):
+def get_url_response(model_time, mod_type, mod_version, request_header, config_vals):
     """
     generates url and does some url checking
     returns response
@@ -158,9 +168,14 @@ def get_url_response(model_time, mod_type, request_header, config_vals):
     url_dt_str = model_time.strftime('%Y%m%d%Hz')
 
     rfc_str = config_vals['rfc_id'].lower() + 'rfc'
-    nwm_var_mod_type = [key for key, value in config_vals['nwm_var_meta'].items() if mod_type in key][0]
+    #pdb.set_trace()
+    nwm_var_mod_type = [key for key, value in config_vals['nwm_version_var_meta'][mod_version].items() if mod_type in key][0]
+    if mod_version == 'para':
+        version_str = mod_version + '_'
+    else:
+        version_str = ''
 
-    full_url = (config_vals['nomads_rfc_url'] + config_vals['rfc_id'] + '/' + config_vals['nwm_type'] + '/' +           # path
+    full_url = (config_vals['nomads_nwm_url'] + version_str + 'post-processed/RFC/' + config_vals['rfc_id'] + '/' + config_vals['nwm_type'] + '/' +           # path
                 nwm_pre + url_dt_str + '.' + nwm_var_mod_type + '.' + config_vals['nwm_type'] + '.' + rfc_str + '.nc')  # filename
 
     response = requests.get(full_url, headers=request_header)
@@ -173,7 +188,7 @@ def get_url_response(model_time, mod_type, request_header, config_vals):
 
     return response, full_url, nwm_var_mod_type
 
-def get_mod_df(now_utc, mod_type, request_header, config_vals):
+def get_mod_df(now_utc, mod_type, mod_version, back, request_header, config_vals):
     """
     will get most recent model run
     """
@@ -181,11 +196,11 @@ def get_mod_df(now_utc, mod_type, request_header, config_vals):
     # for example, model run at 12z is posted at 17:53z.  Assumes cron runs script after 6-hr cardinal time (so about 2 time steps).
     # Similar is the case for short range
     if mod_type == 'medium': # only evaluating medium range blend
-        model_time = now_utc.floor('6h') - pd.Timedelta(hours=6)
+        model_time = now_utc.floor('6h') - pd.Timedelta(hours=(6 * int(back)))
     elif mod_type == 'short':
-        model_time = now_utc.floor('1h') - pd.Timedelta(hours=1)
+        model_time = now_utc.floor('1h') - pd.Timedelta(hours=(1 * int(back)))
     
-    response, full_url, nwm_var_mod_type = get_url_response(model_time, mod_type, request_header, config_vals)
+    response, full_url, nwm_var_mod_type = get_url_response(model_time, mod_type, mod_version, request_header, config_vals)
     
     # if file download exists, convert netcdf to dataframe
     # https://github.com/pydata/xarray/issues/1075
@@ -200,7 +215,7 @@ def get_mod_df(now_utc, mod_type, request_header, config_vals):
 
     return nc_df, model_time, nwm_var_mod_type
 
-def make_csv(df, config_vals, mod_dt, nwm_var_mod_type):
+def make_csv(df, pedtsep, config_vals, mod_dt):
     '''
     csv cols:   lid,
                 pe,
@@ -216,8 +231,6 @@ def make_csv(df, config_vals, mod_dt, nwm_var_mod_type):
                 revision (0/1), 
                 product_id
     '''
-    pedtsep = config_vals['nwm_var_meta'][nwm_var_mod_type][config_vals['nwm_var']]
-
     if pedtsep[2] == 'I':
         dur = 0
 
@@ -269,7 +282,7 @@ def get_array_vals(data, n):
     for i in range(0, len(data), n):
         yield data[i:i+n]
 
-def make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type):
+def make_site_lines(lid, site_df, mod_dt, pedtsep, config_vals):
     """
     generates list of shef rows of data
     """
@@ -277,7 +290,6 @@ def make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type):
     model_dt_str = mod_dt.strftime('%m%d%H%M')
     model_time_str = (mod_dt + pd.Timedelta(hours=1)).strftime('%H%M') # time stemp is one hour after when looking at csv output
 
-    pedtsep = config_vals['nwm_var_meta'][nwm_var_mod_type][config_vals['nwm_var']]
     param_vals = site_df[config_vals['nwm_var']]
     
     interval_str = 'DIH1'
@@ -308,7 +320,7 @@ def main():
     config_vals = load_config_states('config')
     request_header = {'User-Agent' : config_vals['user_agent_pre'] + ' ' + config_vals['rfc_id'] + 'RFC'}
     map_df = map_ids(config_vals, request_header)
-    mod_df, mod_dt, nwm_var_mod_type = get_mod_df(utc_now, arg_vals.mod, request_header, config_vals)
+    mod_df, mod_dt, nwm_var_mod_type = get_mod_df(utc_now, arg_vals.mod, arg_vals.version, arg_vals.back, request_header, config_vals)
 
     nwm_var = config_vals['nwm_var']
 
@@ -318,12 +330,14 @@ def main():
     
     filetime = pd.Timestamp.utcnow().floor('S').tz_localize(None) 
     out_suffix = '.' + out_fmt
-    out_fn = config_vals['outputFileName'] + '.' + nwm_var_mod_type + out_suffix
+    out_fn = config_vals['outputFileName'] + '.' + arg_vals.version + '_' + nwm_var_mod_type + out_suffix
+
+    pedtsep = config_vals['nwm_version_var_meta'][arg_vals.version][nwm_var_mod_type][config_vals['nwm_var']]
 
     if out_fmt == 'csv':
         merged_df[nwm_var] = round((merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3))) # units & round
         merged_df[nwm_var] = merged_df[nwm_var].mask(merged_df[nwm_var] < 0, -9999)
-        csv_df = make_csv(merged_df, config_vals, mod_dt, nwm_var_mod_type)
+        csv_df = make_csv(merged_df, pedtsep, config_vals, mod_dt)
         csv_df.to_csv(os.path.join(out_dir, out_fn), index=False)
     elif out_fmt == 'shef':
         merged_df[nwm_var] = round((merged_df[nwm_var]  * pow(100, 3) / pow(2.54, 3) / pow(12, 3))/1000, 3) # units & round
@@ -334,13 +348,14 @@ def main():
 
         for lid in merged_df['lid'].unique():
             site_df = merged_df[merged_df['lid'] == lid]
-            site_shef_rows_li = make_site_lines(lid, site_df, mod_dt, config_vals, nwm_var_mod_type)
+            site_shef_rows_li = make_site_lines(lid, site_df, mod_dt, pedtsep, config_vals)
 
             f.write('\n'.join(site_shef_rows_li))
             f.write('\n')
             f.flush()
         
         f.close()
+    logging.info('succesful output to: ' + os.path.join(out_dir, out_fn))
 
 if __name__ == '__main__':
     main()

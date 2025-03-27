@@ -1,4 +1,5 @@
-2025-03-23 14:30:29 INFO loading attempt for config file config.yaml
-2025-03-23 14:30:29 INFO loading attempt for mapping file lid_nwm_mapping.yaml
-2025-03-23 14:30:29 INFO Checking mapping file
-2025-03-23 14:30:30 INFO nwm short_range model for 2025-03-23 19Z succesfully downloaded.  URL: https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025032319z.short_range.channel_rt.nwrfc.nc
+2025-03-26 17:59:34 INFO loading attempt for config file config.yaml
+2025-03-26 17:59:34 INFO loading attempt for mapping file lid_nwm_mapping.yaml
+2025-03-26 17:59:34 INFO Checking mapping file
+2025-03-26 17:59:34 INFO nwm short_range model for 2025-03-26 23Z succesfully downloaded.  URL: https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/RFC/NW/channel_rt/nwm.t2025032623z.short_range.channel_rt.nwrfc.nc
+2025-03-26 17:59:35 INFO succesful output to: D:\nwm\nwm_rfc_shef\data\LDAD-SHEF-nwm_nc_pts.oper_short_range.shef
